@@ -66,7 +66,18 @@ namespace XNodeEditor {
                     float oldZoom = zoom;
                     if (e.delta.y > 0) zoom += 0.1f * zoom;
                     else zoom -= 0.1f * zoom;
-                    if (NodeEditorPreferences.GetSettings().zoomToMouse) panOffset += (1 - oldZoom / zoom) * (WindowToGridPosition(e.mousePosition) + panOffset);
+                    if (NodeEditorPreferences.GetSettings().zoomToMouse)
+                    {
+                        panOffset += (1 - oldZoom / zoom) * (WindowToGridPosition(e.mousePosition) + panOffset);
+                        //if (isGroupNode)
+                        //{
+                        //    groupPanOffset += (1 - oldZoom / zoom) * (WindowToGridPosition(e.mousePosition) + groupPanOffset);
+                        //}
+                        //else
+                        //{
+                        //    panOffset += (1 - oldZoom / zoom) * (WindowToGridPosition(e.mousePosition) + panOffset);
+                        //}
+                    }
                     break;
                 case EventType.MouseDrag:
                     if (e.button == 0) {
@@ -277,7 +288,7 @@ namespace XNodeEditor {
 
                         Repaint();
                         currentActivity = NodeActivity.Idle;
-                    } else if (e.button == 1 || e.button == 2) {
+                    } else if (e.button == 1) {
                         if (!isPanning) {
                             if (IsDraggingPort) {
                                 draggedOutputReroutes.Add(WindowToGridPosition(e.mousePosition));
@@ -340,12 +351,13 @@ namespace XNodeEditor {
                         if (e.type == EventType.ExecuteCommand) DuplicateSelectedNodes();
                         e.Use();
                     } else if (e.commandName == "Copy") {
-                        if (!EditorGUIUtility.editingTextField) {
+                        if (true) {
                             if (e.type == EventType.ExecuteCommand) CopySelectedNodes();
                             e.Use();
                         }
                     } else if (e.commandName == "Paste") {
-                        if (!EditorGUIUtility.editingTextField) {
+                        if (true)
+                        {
                             if (e.type == EventType.ExecuteCommand) PasteNodes(WindowToGridPosition(lastMousePosition));
                             e.Use();
                         }
@@ -441,6 +453,12 @@ namespace XNodeEditor {
 
         public void CopySelectedNodes() {
             copyBuffer = Selection.objects.Select(x => x as XNode.Node).Where(x => x != null && x.graph == graph).ToArray();
+        }
+
+        // add
+        public List<XNode.Node> SelectedNodes()
+        {
+            return Selection.objects.Select(x => x as XNode.Node).Where(x => x != null && x.graph == graph).ToList();
         }
 
         public void PasteNodes(Vector2 pos) {
@@ -545,6 +563,7 @@ namespace XNodeEditor {
             Vector2 size;
             if (nodeSizes.TryGetValue(node, out size)) width = size.x;
             else width = 200;
+            float height = size.y;
             Rect windowRect = new Rect(nodePos, new Vector2(width / zoom, 30 / zoom));
             return windowRect.Contains(mousePos);
         }

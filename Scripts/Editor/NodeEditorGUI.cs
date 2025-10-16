@@ -27,13 +27,20 @@ namespace XNodeEditor {
             ValidateGraphEditor();
             Controls();
 
+
             DrawGrid(position, zoom, panOffset);
+            System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            interject();
+            stopwatch.Stop();
             DrawConnections();
             DrawDraggedConnection();
             DrawNodes();
             DrawSelectionBox();
             DrawTooltip();
             graphEditor.OnGUI();
+
+            float time = stopwatch.ElapsedMilliseconds;
+            //Debug.Log(time);
 
             // Run and reset onLateGUI
             if (onLateGUI != null) {
@@ -43,6 +50,27 @@ namespace XNodeEditor {
 
             GUI.matrix = m;
         }
+
+        public virtual void interject()
+        {
+
+        }
+
+        //TODO:
+        public void Convex()
+        {
+            Handles.BeginGUI();
+            Handles.color = new Color(0.2f, 0.5f, 1f, 0.2f); // translucent fill
+            Handles.DrawAAConvexPolygon(new Vector3[4] {
+            new Vector3(0,0,0),
+            new Vector3(100,0,0),
+            new Vector3(100,100,0),
+            new Vector3(0,100,0),
+        });
+
+            Handles.EndGUI();
+        }
+
 
         public static void BeginZoomed(Rect rect, float zoom, float topPadding) {
             GUI.EndClip();
@@ -534,18 +562,31 @@ namespace XNodeEditor {
 
                     //Check if we are hovering any of this nodes ports
                     //Check input ports
+                    int expand = 10;
                     foreach (XNode.NodePort input in node.Inputs) {
                         //Check if port rect is available
                         if (!portConnectionPoints.ContainsKey(input)) continue;
                         Rect r = GridToWindowRectNoClipped(portConnectionPoints[input]);
-                        if (r.Contains(mousePos)) hoveredPort = input;
+                        r.x -= (expand + 4) / 2;
+                        r.y -= expand / 2;
+                        r.width += expand + 4;
+                        r.height += expand;
+                        if (r.Contains(mousePos)) {
+                            hoveredPort = input;
+                        };
                     }
                     //Check all output ports
                     foreach (XNode.NodePort output in node.Outputs) {
                         //Check if port rect is available
                         if (!portConnectionPoints.ContainsKey(output)) continue;
                         Rect r = GridToWindowRectNoClipped(portConnectionPoints[output]);
-                        if (r.Contains(mousePos)) hoveredPort = output;
+                        r.x -= (expand + 4) / 2;
+                        r.y -= expand / 2;
+                        r.width += expand + 4;
+                        r.height += expand;
+                        if (r.Contains(mousePos)) {
+                            hoveredPort = output;
+                        };
                     }
                 }
 
@@ -560,6 +601,8 @@ namespace XNodeEditor {
             //and thus, the code should not be included in build.
             if (onValidate != null && EditorGUI.EndChangeCheck()) onValidate.Invoke(Selection.activeObject, null);
         }
+
+        //add
 
         private bool ShouldBeCulled(XNode.Node node) {
 

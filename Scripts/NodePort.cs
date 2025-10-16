@@ -154,7 +154,130 @@ namespace XNode {
         /// <returns> <see cref="NodePort.GetOutputValue"/> </returns>
         public T GetInputValue<T>() {
             object obj = GetInputValue();
-            return obj is T ? (T) obj : default(T);
+            object convertedValue = ChangeType(obj, typeof(T));
+
+            if (convertedValue == null)
+            {
+                return default(T);
+            }
+            else
+            {
+                return (T)convertedValue;
+            }
+            //TODO:
+            //return obj is T ? (T) obj : default(T);
+        }
+
+        private object ChangeType(object obj, Type type)
+        {
+            if (obj == null) return null;
+
+            Type objType = obj.GetType();
+
+            // Directly return if it's already the target type
+            if (type.IsAssignableFrom(objType))
+                return obj;
+
+            try
+            {
+                // Handle primitives and common types
+                if (type.IsPrimitive || type == typeof(string) || type == typeof(decimal))
+                {
+                    return Convert.ChangeType(obj, type);
+                }
+
+                // Handle Vector2
+                if (type == typeof(Vector2))
+                {
+                    if (obj is float f)
+                        return new Vector2(f, f);
+                    if (obj is int i)
+                        return new Vector2(i, i);
+                }
+
+                // Handle Vector3
+                if (type == typeof(Vector3))
+                {
+                    if (obj is float f)
+                        return new Vector3(f, f, f);
+                    if (obj is int i)
+                        return new Vector3(i, i, i);
+                }
+
+                // Handle Vector4
+                if (type == typeof(Vector4))
+                {
+                    if (obj is float f)
+                        return new Vector4(f, f, f, f);
+                    if (obj is int i)
+                        return new Vector4(i, i, i, i);
+                }
+
+                // If obj is List<X> and type is X → return first element
+                if (objType.IsGenericType && objType.GetGenericTypeDefinition() == typeof(List<>))
+                {
+                    Type elementType = objType.GetGenericArguments()[0];
+
+                    if (type == elementType)
+                    {
+                        var list = (System.Collections.IList)obj;
+                        if (list.Count > 0)
+                            return list[0];
+                        else
+                            return null; // or default value for that type
+                    }
+                }
+
+                // Handle List<T>
+                if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
+                {
+                    Type targetElementType = type.GetGenericArguments()[0];
+
+                    // Custom conversion: List<float/int> to List<Vector2/Vector3>
+                    if ((obj is List<float> floatList || obj is List<int> intList) &&
+                        (targetElementType == typeof(Vector2) || targetElementType == typeof(Vector3)))
+                    {
+                        var sourceList = obj as System.Collections.IEnumerable;
+                        var targetList = (System.Collections.IList)Activator.CreateInstance(type);
+
+                        foreach (var item in sourceList)
+                        {
+                            float val = Convert.ToSingle(item);
+
+                            if (targetElementType == typeof(Vector2))
+                                targetList.Add(new Vector2(val, val));
+                            else if (targetElementType == typeof(Vector3))
+                                targetList.Add(new Vector3(val, val, val));
+                        }
+
+                        return targetList;
+                    }
+
+                    // General case: List<X> → List<Y>
+                    if (objType.IsGenericType && objType.GetGenericTypeDefinition() == typeof(List<>))
+                    {
+                        var sourceList = (System.Collections.IEnumerable)obj;
+                        var targetList = (System.Collections.IList)Activator.CreateInstance(type);
+
+                        foreach (var item in sourceList)
+                            targetList.Add(Convert.ChangeType(item, targetElementType));
+
+                        return targetList;
+                    }
+
+                    // Scalar to List<T>
+                    object convertedItem = Convert.ChangeType(obj, targetElementType);
+                    var listWithSingle = (System.Collections.IList)Activator.CreateInstance(type);
+                    listWithSingle.Add(convertedItem);
+                    return listWithSingle;
+                }
+            }
+            catch
+            {
+                // Ignore exceptions and fall through to return null
+            }
+
+            return null;
         }
 
         /// <summary> Return the output values of all connected ports. </summary>

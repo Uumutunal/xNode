@@ -65,7 +65,6 @@ namespace XNodeEditor {
                 }
             }
         }
-
         public Dictionary<XNode.Node, Vector2> nodeSizes { get { return _nodeSizes; } }
         private Dictionary<XNode.Node, Vector2> _nodeSizes = new Dictionary<XNode.Node, Vector2>();
         public XNode.NodeGraph graph;
@@ -115,7 +114,7 @@ namespace XNodeEditor {
         /// <summary> Create editor window </summary>
         public static NodeEditorWindow Init() {
             NodeEditorWindow w = CreateInstance<NodeEditorWindow>();
-            w.titleContent = new GUIContent("xNode");
+            w.titleContent = new GUIContent("xNodes");
             w.wantsMouseMove = true;
             w.Show();
             return w;

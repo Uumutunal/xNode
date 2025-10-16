@@ -24,6 +24,7 @@ namespace XNode {
     /// </example>
     [Serializable]
     public abstract class Node : ScriptableObject {
+
         /// <summary> Used by <see cref="InputAttribute"/> and <see cref="OutputAttribute"/> to determine when to display the field value associated with a <see cref="NodePort"/> </summary>
         public enum ShowBackingValue {
             /// <summary> Never show the backing value </summary>
@@ -247,6 +248,7 @@ namespace XNode {
             Debug.LogWarning("No GetValue(NodePort port) override defined for " + GetType());
             return null;
         }
+
 #endregion
 
         /// <summary> Called after a connection between two <see cref="NodePort"/>s is created </summary>
