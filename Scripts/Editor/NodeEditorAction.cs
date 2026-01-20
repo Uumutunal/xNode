@@ -22,6 +22,8 @@ namespace XNodeEditor {
         public bool IsHoveringNode { get { return hoveredNode != null; } }
         public bool IsHoveringReroute { get { return hoveredReroute.port != null; } }
 
+        public bool IsHoveringToolbar;
+
         /// <summary> Return the dragged port or null if not exist </summary>
         public XNode.NodePort DraggedOutputPort { get { XNode.NodePort result = draggedOutput; return result; } }
         /// <summary> Return the Hovered port or null if not exist </summary>
@@ -41,14 +43,21 @@ namespace XNodeEditor {
         private Vector2 dragBoxStart;
         private UnityEngine.Object[] preBoxSelection;
         private RerouteReference[] preBoxSelectionReroute;
-        private Rect selectionBox;
+        //TODO: keep it private
+        public Rect selectionBox;
         private bool isDoubleClick = false;
         private Vector2 lastMousePosition;
-        private float dragThreshold = 1f;
+        private float dragThreshold = .01f;
+        private int frameControlID = 0;
 
         public void Controls() {
             wantsMouseMove = true;
             Event e = Event.current;
+
+            IsHoveringTopToolbar();
+
+            //if (IsHoveringToolbar) return;
+
             switch (e.type) {
                 case EventType.DragUpdated:
                 case EventType.DragPerform:
@@ -142,6 +151,11 @@ namespace XNodeEditor {
                                 }
                                 selectedReroutes[i].SetPoint(pos);
                             }
+
+                            NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
+                            int controlID = GUIUtility.GetControlID(FocusType.Passive);
+                            GUIUtility.hotControl = controlID;
+
                             Repaint();
                         } else if (currentActivity == NodeActivity.HoldGrid) {
                             currentActivity = NodeActivity.DragGrid;
@@ -157,12 +171,20 @@ namespace XNodeEditor {
                             selectionBox = new Rect(boxStartPos, boxSize);
                             Repaint();
                         }
+
+                        if (!IsHoveringNode && frameControlID == 0)
+                        {
+                            NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
+                            int controlID = GUIUtility.GetControlID(FocusType.Passive);
+                            GUIUtility.hotControl = controlID;
+                        }
                     } else if (e.button == 1 || e.button == 2) {
                         //check drag threshold for larger screens
-                        if (e.delta.magnitude > dragThreshold) {
-                            panOffset += e.delta * zoom;
-                            isPanning = true;
-                        }
+                        panOffset += e.delta * zoom;
+                        isPanning = true;
+                        NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
+                        int controlID = GUIUtility.GetControlID(FocusType.Passive);
+                        GUIUtility.hotControl = controlID;
                     }
                     break;
                 case EventType.MouseDown:
@@ -188,8 +210,9 @@ namespace XNodeEditor {
                                     if (NodeEditor.onUpdateNode != null) NodeEditor.onUpdateNode(node);
                                 }
                             }
-                        } else if (IsHoveringNode && IsHoveringTitle(hoveredNode)) {
+                        } else if (IsHoveringNode && IsHoveringClickableNode(hoveredNode) && !IsHoveringToolbar) {
                             // If mousedown on node header, select or deselect
+                            //Debug.Log("asd");
                             if (!Selection.Contains(hoveredNode)) {
                                 SelectNode(hoveredNode, e.control || e.shift);
                                 if (!e.control && !e.shift) selectedReroutes.Clear();
@@ -198,7 +221,8 @@ namespace XNodeEditor {
                             // Cache double click state, but only act on it in MouseUp - Except ClickCount only works in mouseDown.
                             isDoubleClick = (e.clickCount == 2);
 
-                            e.Use();
+                            //TODO: make the entire node selectable
+                            //e.Use();
                             currentActivity = NodeActivity.HoldNode;
                         } else if (IsHoveringReroute) {
                             // If reroute isn't selected
@@ -225,9 +249,19 @@ namespace XNodeEditor {
                                 Selection.activeObject = null;
                             }
                         }
+                        else if (IsHoveringNode && !IsHoveringTitle(hoveredNode))
+                        {
+                            frameControlID = 1;
+                        }
                     }
                     break;
                 case EventType.MouseUp:
+                    if (currentActivity != NodeActivity.Idle || IsDraggingPort || isPanning)
+                    {
+                        GUIUtility.hotControl = 0;
+                        NodeEditorWindow.current.wantsMouseEnterLeaveWindow = false;
+                    }
+                    frameControlID = 0;
                     if (e.button == 0) {
                         //Port drag release
                         if (IsDraggingPort) {
@@ -313,6 +347,9 @@ namespace XNodeEditor {
                                 menu.DropDown(new Rect(Event.current.mousePosition, Vector2.zero));
                             }
                         }
+                        isPanning = false;
+                    } else if (e.button == 2)
+                    {
                         isPanning = false;
                     }
                     // Reset DoubleClick
@@ -490,6 +527,8 @@ namespace XNodeEditor {
                 substitutes.Add(srcNode, newNode);
                 newNode.position = srcNode.position + offset;
                 newNodes[i] = newNode;
+
+                newNode.isPasted = true;
             }
 
             // Walk through the selected nodes again, recreate connections, using the new nodes
@@ -555,6 +594,25 @@ namespace XNodeEditor {
             }
         }
 
+        bool IsOverControl(XNode.Node node)
+        {
+            Vector2 mousePos = Event.current.mousePosition;
+            Vector2 nodePos = GridToWindowPosition(node.position);
+
+            foreach (Rect r in node.controlRects)
+            {
+                Rect worldRect = new Rect(
+                    nodePos + r.position / zoom,
+                    r.size / zoom
+                );
+
+                if (worldRect.Contains(mousePos))
+                    return true;
+            }
+
+            return false;
+        }
+
         bool IsHoveringTitle(XNode.Node node) {
             Vector2 mousePos = Event.current.mousePosition;
             //Get node position
@@ -563,9 +621,44 @@ namespace XNodeEditor {
             Vector2 size;
             if (nodeSizes.TryGetValue(node, out size)) width = size.x;
             else width = 200;
-            float height = size.y;
+            //float height = size.y;
             Rect windowRect = new Rect(nodePos, new Vector2(width / zoom, 30 / zoom));
+
             return windowRect.Contains(mousePos);
+        }
+
+        //TODO: make the entire node selectable
+        bool IsHoveringClickableNode(XNode.Node node)
+        {
+            Vector2 mousePos = Event.current.mousePosition;
+            //Get node position
+            Vector2 nodePos = GridToWindowPosition(node.position);
+
+            foreach (var r in node.controlRects)
+            {
+                Rect controlRect = new Rect(
+                    nodePos + r.position / zoom,
+                    r.size / zoom
+                );
+
+                if (controlRect.Contains(mousePos))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool IsHoveringTopToolbar()
+        {
+            Vector2 mousePos = Event.current.mousePosition;
+            if (mousePos.y < 23)
+            {
+                IsHoveringToolbar = true;
+                return true;
+            }
+            IsHoveringToolbar = false;
+            return false;
         }
 
         /// <summary> Attempt to connect dragged output to target node </summary>

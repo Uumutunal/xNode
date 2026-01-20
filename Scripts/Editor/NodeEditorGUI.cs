@@ -30,7 +30,7 @@ namespace XNodeEditor {
 
             DrawGrid(position, zoom, panOffset);
             System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            interject();
+            DrawOverlays();
             stopwatch.Stop();
             DrawConnections();
             DrawDraggedConnection();
@@ -40,7 +40,6 @@ namespace XNodeEditor {
             graphEditor.OnGUI();
 
             float time = stopwatch.ElapsedMilliseconds;
-            //Debug.Log(time);
 
             // Run and reset onLateGUI
             if (onLateGUI != null) {
@@ -51,7 +50,7 @@ namespace XNodeEditor {
             GUI.matrix = m;
         }
 
-        public virtual void interject()
+        public virtual void DrawOverlays()
         {
 
         }
@@ -373,6 +372,7 @@ namespace XNodeEditor {
                     Rect fromRect;
                     if (!_portConnectionPoints.TryGetValue(output, out fromRect)) continue;
 
+                    //TODO: fix port color
                     Color portColor = graphEditor.GetPortColor(output);
                     GUIStyle portStyle = graphEditor.GetPortStyle(output);
 

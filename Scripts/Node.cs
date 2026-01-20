@@ -56,7 +56,14 @@ namespace XNode {
             InheritedAny
         }
 
-#region Obsolete
+        [HideInInspector]
+        public bool isPasted;
+        [HideInInspector]
+        [NonSerialized]
+        public List<Rect> controlRects = new();
+
+
+        #region Obsolete
         [Obsolete("Use DynamicPorts instead")]
         public IEnumerable<NodePort> InstancePorts { get { return DynamicPorts; } }
 
@@ -218,7 +225,7 @@ namespace XNode {
             else return null;
         }
 
-        public bool HasPort(string fieldName) {
+        public bool HasPort(string fieldName) { 
             return ports.ContainsKey(fieldName);
         }
 #endregion

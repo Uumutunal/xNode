@@ -54,6 +54,11 @@ namespace XNode {
         }
         private Type valueType;
 
+        public void Rename(string name)
+        {
+            _fieldName = name;
+        }
+
         [SerializeField] private string _fieldName;
         [SerializeField] private Node _node;
         [SerializeField] private string _typeQualifiedName;
