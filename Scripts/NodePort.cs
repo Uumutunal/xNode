@@ -169,8 +169,6 @@ namespace XNode {
             {
                 return (T)convertedValue;
             }
-            //TODO:
-            //return obj is T ? (T) obj : default(T);
         }
 
         private object ChangeType(object obj, Type type)

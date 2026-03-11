@@ -86,7 +86,6 @@ namespace XNodeEditor {
 
             for (int i = 0; i < nodeTypes.Length; i++) {
                 Type type = nodeTypes[i];
-
                 //Get node context menu path
                 string path = GetNodeMenuName(type);
                 if (string.IsNullOrEmpty(path)) continue;

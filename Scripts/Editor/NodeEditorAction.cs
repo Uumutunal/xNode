@@ -43,12 +43,15 @@ namespace XNodeEditor {
         private Vector2 dragBoxStart;
         private UnityEngine.Object[] preBoxSelection;
         private RerouteReference[] preBoxSelectionReroute;
-        //TODO: keep it private
-        public Rect selectionBox;
+
+        public Rect SelectionBox { get { return _selectionBox; } private set { _selectionBox = value; } }
+        private Rect _selectionBox;
+
         private bool isDoubleClick = false;
         private Vector2 lastMousePosition;
         private float dragThreshold = .01f;
         private int frameControlID = 0;
+        private int graphDragControlId = 0;
 
         public void Controls() {
             wantsMouseMove = true;
@@ -78,14 +81,6 @@ namespace XNodeEditor {
                     if (NodeEditorPreferences.GetSettings().zoomToMouse)
                     {
                         panOffset += (1 - oldZoom / zoom) * (WindowToGridPosition(e.mousePosition) + panOffset);
-                        //if (isGroupNode)
-                        //{
-                        //    groupPanOffset += (1 - oldZoom / zoom) * (WindowToGridPosition(e.mousePosition) + groupPanOffset);
-                        //}
-                        //else
-                        //{
-                        //    panOffset += (1 - oldZoom / zoom) * (WindowToGridPosition(e.mousePosition) + panOffset);
-                        //}
                     }
                     break;
                 case EventType.MouseDrag:
@@ -168,7 +163,7 @@ namespace XNodeEditor {
                             Vector2 boxSize = e.mousePosition - boxStartPos;
                             if (boxSize.x < 0) { boxStartPos.x += boxSize.x; boxSize.x = Mathf.Abs(boxSize.x); }
                             if (boxSize.y < 0) { boxStartPos.y += boxSize.y; boxSize.y = Mathf.Abs(boxSize.y); }
-                            selectionBox = new Rect(boxStartPos, boxSize);
+                            SelectionBox = new Rect(boxStartPos, boxSize);
                             Repaint();
                         }
 
@@ -210,9 +205,10 @@ namespace XNodeEditor {
                                     if (NodeEditor.onUpdateNode != null) NodeEditor.onUpdateNode(node);
                                 }
                             }
-                        } else if (IsHoveringNode && IsHoveringClickableNode(hoveredNode) && !IsHoveringToolbar) {
+                        } else if (IsHoveringNode && IsHoveringTitle(hoveredNode) && !IsHoveringToolbar) {
+                            graphDragControlId = GUIUtility.GetControlID(FocusType.Passive);
+
                             // If mousedown on node header, select or deselect
-                            //Debug.Log("asd");
                             if (!Selection.Contains(hoveredNode)) {
                                 SelectNode(hoveredNode, e.control || e.shift);
                                 if (!e.control && !e.shift) selectedReroutes.Clear();
@@ -221,7 +217,6 @@ namespace XNodeEditor {
                             // Cache double click state, but only act on it in MouseUp - Except ClickCount only works in mouseDown.
                             isDoubleClick = (e.clickCount == 2);
 
-                            //TODO: make the entire node selectable
                             //e.Use();
                             currentActivity = NodeActivity.HoldNode;
                         } else if (IsHoveringReroute) {
@@ -258,15 +253,18 @@ namespace XNodeEditor {
                 case EventType.MouseUp:
                     if (currentActivity != NodeActivity.Idle || IsDraggingPort || isPanning)
                     {
-                        GUIUtility.hotControl = 0;
-                        NodeEditorWindow.current.wantsMouseEnterLeaveWindow = false;
+                        if (GUIUtility.hotControl == graphDragControlId)
+                        {
+                            GUIUtility.hotControl = 0;
+                            NodeEditorWindow.current.wantsMouseEnterLeaveWindow = false;
+                        }
                     }
                     frameControlID = 0;
                     if (e.button == 0) {
                         //Port drag release
                         if (IsDraggingPort) {
                             // If connection is valid, save it
-                            if (draggedOutputTarget != null && graphEditor.CanConnect(draggedOutput, draggedOutputTarget)) {
+                            if (draggedOutputTarget != null && graphEditor.CanConnect(draggedOutput, draggedOutputTarget) && !WouldCreateCycle(draggedOutput.node, draggedOutputTarget.node)) {
                                 XNode.Node node = draggedOutputTarget.node;
                                 if (graph.nodes.Count != 0) draggedOutput.Connect(draggedOutputTarget);
 
@@ -594,6 +592,11 @@ namespace XNodeEditor {
             }
         }
 
+        public void ClearSelectionBox()
+        {
+            SelectionBox = new();
+        }
+
         bool IsOverControl(XNode.Node node)
         {
             Vector2 mousePos = Event.current.mousePosition;
@@ -627,28 +630,6 @@ namespace XNodeEditor {
             return windowRect.Contains(mousePos);
         }
 
-        //TODO: make the entire node selectable
-        bool IsHoveringClickableNode(XNode.Node node)
-        {
-            Vector2 mousePos = Event.current.mousePosition;
-            //Get node position
-            Vector2 nodePos = GridToWindowPosition(node.position);
-
-            foreach (var r in node.controlRects)
-            {
-                Rect controlRect = new Rect(
-                    nodePos + r.position / zoom,
-                    r.size / zoom
-                );
-
-                if (controlRect.Contains(mousePos))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         bool IsHoveringTopToolbar()
         {
             Vector2 mousePos = Event.current.mousePosition;
@@ -658,6 +639,31 @@ namespace XNodeEditor {
                 return true;
             }
             IsHoveringToolbar = false;
+            return false;
+        }
+
+        private bool WouldCreateCycle(XNode.Node source, XNode.Node target)
+        {
+            return HasPath(target, source, new HashSet<XNode.Node>());
+        }
+
+        private bool HasPath(XNode.Node current, XNode.Node goal, HashSet<XNode.Node> visited)
+        {
+            if (current == goal)
+                return true;
+
+            if (!visited.Add(current))
+                return false;
+
+            foreach (var output in current.Outputs)
+            {
+                foreach (var connection in output.GetConnections())
+                {
+                    if (HasPath(connection.node, goal, visited))
+                        return true;
+                }
+            }
+
             return false;
         }
 

@@ -58,8 +58,8 @@ namespace XNode {
 
         [HideInInspector]
         public bool isPasted;
-        [HideInInspector]
-        [NonSerialized]
+        // Detects the node body selection, unused.
+        [HideInInspector, NonSerialized]
         public List<Rect> controlRects = new();
 
 
@@ -98,10 +98,6 @@ namespace XNode {
             RemoveDynamicPort(port);
         }
 
-        [Obsolete("Use ClearDynamicPorts instead")]
-        public void ClearInstancePorts() {
-            ClearDynamicPorts();
-        }
 #endregion
 
         /// <summary> Iterate over all ports on this node. </summary>
@@ -132,7 +128,7 @@ namespace XNode {
             UpdatePorts();
             Init();
         }
-
+         
         /// <summary> Update static ports and dynamic ports managed by DynamicPortLists to reflect class fields. This happens automatically on enable or on redrawing a dynamic port list. </summary>
         public void UpdatePorts() {
             NodeDataCache.UpdatePorts(this, ports);
@@ -144,7 +140,7 @@ namespace XNode {
         /// <summary> Checks all connections for invalid references, and removes them. </summary>
         public void VerifyConnections() {
             foreach (NodePort port in Ports) port.VerifyConnections();
-        }
+        }  
 
 #region Dynamic Ports
         /// <summary> Convenience function. </summary>
@@ -193,14 +189,6 @@ namespace XNode {
             ports.Remove(port.fieldName);
         }
 
-        /// <summary> Removes all dynamic ports from the node </summary>
-        [ContextMenu("Clear Dynamic Ports")]
-        public void ClearDynamicPorts() {
-            List<NodePort> dynamicPorts = new List<NodePort>(DynamicPorts);
-            foreach (NodePort port in dynamicPorts) {
-                RemoveDynamicPort(port);
-            }
-        }
 #endregion
 
 #region Ports

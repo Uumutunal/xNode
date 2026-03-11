@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -29,17 +30,17 @@ namespace XNodeEditor {
 
 
             DrawGrid(position, zoom, panOffset);
-            System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
             DrawOverlays();
-            stopwatch.Stop();
             DrawConnections();
             DrawDraggedConnection();
+            Stopwatch stopwatch = Stopwatch.StartNew();
             DrawNodes();
+            stopwatch.Stop();
+            double time = stopwatch.ElapsedTicks * 1000.0 / Stopwatch.Frequency;
+            //UnityEngine.Debug.Log(time);
             DrawSelectionBox();
             DrawTooltip();
             graphEditor.OnGUI();
-
-            float time = stopwatch.ElapsedMilliseconds;
 
             // Run and reset onLateGUI
             if (onLateGUI != null) {
@@ -54,22 +55,6 @@ namespace XNodeEditor {
         {
 
         }
-
-        //TODO:
-        public void Convex()
-        {
-            Handles.BeginGUI();
-            Handles.color = new Color(0.2f, 0.5f, 1f, 0.2f); // translucent fill
-            Handles.DrawAAConvexPolygon(new Vector3[4] {
-            new Vector3(0,0,0),
-            new Vector3(100,0,0),
-            new Vector3(100,100,0),
-            new Vector3(0,100,0),
-        });
-
-            Handles.EndGUI();
-        }
-
 
         public static void BeginZoomed(Rect rect, float zoom, float topPadding) {
             GUI.EndClip();
@@ -372,7 +357,6 @@ namespace XNodeEditor {
                     Rect fromRect;
                     if (!_portConnectionPoints.TryGetValue(output, out fromRect)) continue;
 
-                    //TODO: fix port color
                     Color portColor = graphEditor.GetPortColor(output);
                     GUIStyle portStyle = graphEditor.GetPortStyle(output);
 
@@ -414,7 +398,7 @@ namespace XNodeEditor {
 
                             GUI.color = portColor;
                             GUI.DrawTexture(rect, portStyle.active.background);
-                            if (rect.Overlaps(selectionBox)) selection.Add(rerouteRef);
+                            if (rect.Overlaps(SelectionBox)) selection.Add(rerouteRef);
                             if (rect.Contains(mousePos)) hoveredReroute = rerouteRef;
 
                         }
@@ -601,9 +585,7 @@ namespace XNodeEditor {
             //and thus, the code should not be included in build.
             if (onValidate != null && EditorGUI.EndChangeCheck()) onValidate.Invoke(Selection.activeObject, null);
         }
-
-        //add
-
+            
         private bool ShouldBeCulled(XNode.Node node) {
 
             Vector2 nodePos = GridToWindowPositionNoClipped(node.position);
