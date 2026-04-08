@@ -36,11 +36,12 @@ namespace XNodeEditor {
             Stopwatch stopwatch = Stopwatch.StartNew();
             DrawNodes();
             stopwatch.Stop();
-            double time = stopwatch.ElapsedTicks * 1000.0 / Stopwatch.Frequency;
-            //UnityEngine.Debug.Log(time);
             DrawSelectionBox();
             DrawTooltip();
             graphEditor.OnGUI();
+
+            double time = stopwatch.ElapsedTicks * 1000.0 / Stopwatch.Frequency;
+            //UnityEngine.Debug.Log(time);
 
             // Run and reset onLateGUI
             if (onLateGUI != null) {
@@ -204,7 +205,7 @@ namespace XNodeEditor {
                         Vector2 tangent_a = point_a + outputTangent * zoomCoef;
                         Vector2 tangent_b = point_b + inputTangent * zoomCoef;
                         // Hover effect.
-                        int division = Mathf.RoundToInt(.2f * dist_ab) + 3;
+                        int division = 25;
                         // Coloring and bezier drawing.
                         int draw = 0;
                         Vector2 bezierPrevious = point_a;
@@ -230,9 +231,8 @@ namespace XNodeEditor {
                         Vector2 point_b = gridPoints[i + 1];
                         // Draws the line with the coloring.
                         Vector2 prev_point = point_a;
-                        // Approximately one segment per 5 pixels
-                        int segments = (int) Vector2.Distance(point_a, point_b) / 5;
-                        segments = Math.Max(segments, 1);
+
+                        int segments = 3;
 
                         int draw = 0;
                         for (int j = 0; j <= segments; j++) {
@@ -249,9 +249,11 @@ namespace XNodeEditor {
                     }
                     break;
                 case NoodlePath.Angled:
+                    float xThreshold = 50f / zoom;
+                    float xOffset = 25f / zoom;
+
                     for (int i = 0; i < length - 1; i++) {
-                        if (i == length - 1) continue; // Skip last index
-                        if (gridPoints[i].x <= gridPoints[i + 1].x - (50 / zoom)) {
+                        if (gridPoints[i].x <= gridPoints[i + 1].x - xThreshold) {
                             float midpoint = (gridPoints[i].x + gridPoints[i + 1].x) * 0.5f;
                             Vector2 start_1 = gridPoints[i];
                             Vector2 end_1 = gridPoints[i + 1];
@@ -272,8 +274,8 @@ namespace XNodeEditor {
                             float midpoint = (gridPoints[i].y + gridPoints[i + 1].y) * 0.5f;
                             Vector2 start_1 = gridPoints[i];
                             Vector2 end_1 = gridPoints[i + 1];
-                            start_1.x += 25 / zoom;
-                            end_1.x -= 25 / zoom;
+                            start_1.x += xOffset;
+                            end_1.x -= xOffset;
                             Vector2 start_2 = start_1;
                             Vector2 end_2 = end_1;
                             start_2.y = midpoint;
@@ -314,9 +316,8 @@ namespace XNodeEditor {
                         Vector2 point_b = gridPoints[i + 1];
                         // Draws the line with the coloring.
                         Vector2 prev_point = point_a;
-                        // Approximately one segment per 5 pixels
-                        int segments = (int) Vector2.Distance(point_a, point_b) / 5;
-                        segments = Math.Max(segments, 1);
+
+                        int segments = 2;
 
                         int draw = 0;
                         for (int j = 0; j <= segments; j++) {
