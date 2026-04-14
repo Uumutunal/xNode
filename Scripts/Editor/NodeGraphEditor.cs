@@ -117,7 +117,7 @@ namespace XNodeEditor {
         /// <param name="input"> The output this noodle comes from. Can be null if we are dragging the noodle. </param>
         public virtual Gradient GetNoodleGradient(XNode.NodePort output, XNode.NodePort input) {
             Gradient grad = new Gradient();
-
+            
             // If dragging the noodle, draw solid, slightly transparent
             if (input == null) {
                 Color a = GetTypeColor(output.ValueType);
@@ -131,7 +131,7 @@ namespace XNodeEditor {
                 Color a = GetTypeColor(output.ValueType);
                 Color b = GetTypeColor(input.ValueType);
                 // If any port is hovered, tint white
-                if (window.hoveredPort == output || window.hoveredPort == input) {
+                if (window.hoveredPort == output || window.hoveredPort == input || (window.hoveredConnection?.Input == input && window.hoveredConnection?.Output == output)) {
                     a = Color.Lerp(a, Color.white, 0.8f);
                     b = Color.Lerp(b, Color.white, 0.8f);
                 }

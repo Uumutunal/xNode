@@ -1,14 +1,16 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using XNode;
 using XNodeEditor.Internal;
 #if UNITY_2019_1_OR_NEWER && USE_ADVANCED_GENERIC_MENU
 using GenericMenu = XNodeEditor.AdvancedGenericMenu;
 #endif
 
-namespace XNodeEditor {
+namespace XNodeEditor
+{
     public partial class NodeEditorWindow {
         public enum NodeActivity { Idle, HoldNode, DragNode, HoldGrid, DragGrid }
         public static NodeActivity currentActivity = NodeActivity.Idle;
@@ -31,17 +33,18 @@ namespace XNodeEditor {
         /// <summary> Return the Hovered node or null if not exist </summary>
         public XNode.Node HoveredNode { get { XNode.Node result = hoveredNode; return result; } }
 
-        private XNode.Node hoveredNode = null;
+        [NonSerialized] private XNode.Node hoveredNode = null;
         [NonSerialized] public XNode.NodePort hoveredPort = null;
         [NonSerialized] private XNode.NodePort draggedOutput = null;
         [NonSerialized] private XNode.NodePort draggedOutputTarget = null;
         [NonSerialized] private XNode.NodePort autoConnectOutput = null;
         [NonSerialized] private List<Vector2> draggedOutputReroutes = new List<Vector2>();
+        [NonSerialized] private Dictionary<Connection, Vector2> intersectedConnections = new();
 
         private RerouteReference hoveredReroute = new RerouteReference();
         public List<RerouteReference> selectedReroutes = new List<RerouteReference>();
         private Vector2 dragBoxStart;
-        private UnityEngine.Object[] preBoxSelection;
+        private UnityEngine.Object[] preBoxSelection; 
         private RerouteReference[] preBoxSelectionReroute;
 
         public Rect SelectionBox { get { return _selectionBox; } private set { _selectionBox = value; } }
@@ -52,14 +55,14 @@ namespace XNodeEditor {
         private float dragThreshold = .01f;
         private int frameControlID = 0;
         private int graphDragControlId = 0;
+        private bool altHeld = false;
+
 
         public void Controls() {
             wantsMouseMove = true;
             Event e = Event.current;
 
             IsHoveringTopToolbar();
-
-            //if (IsHoveringToolbar) return;
 
             switch (e.type) {
                 case EventType.DragUpdated:
@@ -102,12 +105,15 @@ namespace XNodeEditor {
                             // Holding ctrl inverts grid snap
                             bool gridSnap = NodeEditorPreferences.GetSettings().gridSnap;
                             if (e.control) gridSnap = !gridSnap;
+                            XNode.Node selectedNode = null;
 
                             Vector2 mousePos = WindowToGridPosition(e.mousePosition);
                             // Move selected nodes with offset
                             for (int i = 0; i < Selection.objects.Length; i++) {
                                 if (Selection.objects[i] is XNode.Node) {
                                     XNode.Node node = Selection.objects[i] as XNode.Node;
+                                    if (selectedNode == null) selectedNode = node;
+
                                     Undo.RecordObject(node, "Moved Node");
                                     Vector2 initial = node.position;
                                     node.position = mousePos + dragOffset[i];
@@ -146,6 +152,84 @@ namespace XNodeEditor {
                                 }
                                 selectedReroutes[i].SetPoint(pos);
                             }
+
+
+                            if (altHeld)
+                            {
+                                var input = selectedNode.Inputs.FirstOrDefault();
+                                var output = selectedNode.Outputs.FirstOrDefault();
+
+                                var inputConn = input?.Connection;
+                                var outputConn = output?.Connection;
+
+                                if (inputConn != null && outputConn != null)
+                                {
+                                    inputConn.Connect(outputConn);
+                                }
+                                selectedNode.ClearConnections();
+                            }
+
+                            //
+                            List<NodePort> inputs = selectedNode.Inputs.ToList();
+                            if (Selection.objects.Length == 1 && inputs.Count > 0 && !inputs[0].IsConnected && !altHeld)
+                            {
+                                Vector2 nodePos = GridToWindowPosition(selectedNode.position);
+                                Vector2 size = nodeSizes.TryGetValue(selectedNode, out var s) ? s : new Vector2(50, 50);
+                                 
+                                Rect nodeRect = new Rect(nodePos, size / zoom);
+                                bool isHoveringConnection = false;
+                                intersectedConnections.Clear();
+                                HashSet<XNode.NodePort> movingNodePorts = new HashSet<XNode.NodePort>(selectedNode.Ports);
+
+                                foreach (var kvp in connectionCache)
+                                {
+                                    Connection connection = kvp.Key;
+                                    List<Vector2> points = kvp.Value;
+
+                                    if (movingNodePorts.Contains(connection.Input) || movingNodePorts.Contains(connection.Output))
+                                        continue;
+
+                                    Vector2 inputNodePos = GridToWindowPosition(connection.Input.node.position);
+                                    Vector2 outputNodePos = GridToWindowPosition(connection.Output.node.position);
+
+                                    if (!IsInsideBounds(inputNodePos, outputNodePos, nodeRect))
+                                    {
+                                        continue;
+                                    }
+
+                                    for (int i = 0; i < points.Count - 1; i++)
+                                    {
+
+                                        if (LineIntersectsRect(points[i], points[i + 1], nodeRect, out Vector2 intersection))
+                                        {
+                                            hoveredConnection = connection;
+                                            isHoveringConnection = true;
+                                            intersectedConnections[connection] = WindowToGridPosition(intersection);
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (!isHoveringConnection)
+                                {
+                                    hoveredConnection = null;
+                                }
+
+                                if (intersectedConnections.Count > 1)
+                                {
+                                    float dist = float.MaxValue;
+                                    foreach (var kv in intersectedConnections)
+                                    {
+                                        float nDist = Vector2.SqrMagnitude(mousePos - kv.Value);
+                                        if (nDist < dist)
+                                        {
+                                            dist = nDist;
+                                            hoveredConnection = kv.Key;
+                                        }
+                                    }
+                                }
+                            }
+
+                            //
 
                             NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
                             int controlID = GUIUtility.GetControlID(FocusType.Passive);
@@ -288,7 +372,25 @@ namespace XNodeEditor {
                             EditorUtility.SetDirty(graph);
                             if (NodeEditorPreferences.GetSettings().autoSave) AssetDatabase.SaveAssets();
                         } else if (currentActivity == NodeActivity.DragNode) {
+
                             IEnumerable<XNode.Node> nodes = Selection.objects.Where(x => x is XNode.Node).Select(x => x as XNode.Node);
+
+                            //
+                            if (hoveredConnection != null && !altHeld)
+                            {
+                                var node = nodes.FirstOrDefault();
+                                var selectedInput = node.Inputs.FirstOrDefault();
+                                var selectedOutput = node.Outputs.FirstOrDefault();
+                                if (selectedInput != null && !selectedInput.IsConnected)
+                                {
+                                    selectedInput.Connect(hoveredConnection.Output);
+                                    selectedOutput.Connect(hoveredConnection.Input);
+                                }
+                                hoveredConnection = null;
+                            }
+                            //
+
+
                             foreach (XNode.Node node in nodes) EditorUtility.SetDirty(node);
                             if (NodeEditorPreferences.GetSettings().autoSave) AssetDatabase.SaveAssets();
                         } else if (!IsHoveringNode) {
@@ -373,6 +475,22 @@ namespace XNodeEditor {
                         }
                         Repaint();
                     }
+                    if (e.keyCode == KeyCode.X)
+                    {
+                        RemoveSelectedNodes();
+                        e.Use();
+                    }
+                    if (e.keyCode == KeyCode.LeftAlt || e.keyCode == KeyCode.RightAlt)
+                    {
+                        altHeld = true;
+                        hoveredConnection = null;
+                    }
+                    break;
+                case EventType.KeyUp:
+                    if (e.keyCode == KeyCode.LeftAlt || e.keyCode == KeyCode.RightAlt)
+                    {
+                        altHeld = false;
+                    }
                     break;
                 case EventType.ValidateCommand:
                 case EventType.ExecuteCommand:
@@ -406,6 +524,10 @@ namespace XNodeEditor {
                         currentActivity = NodeActivity.Idle;
                     }
                     break;
+            }
+            if (!e.alt)
+            {
+                altHeld = false;
             }
         }
 
@@ -490,7 +612,6 @@ namespace XNodeEditor {
             copyBuffer = Selection.objects.Select(x => x as XNode.Node).Where(x => x != null && x.graph == graph).ToArray();
         }
 
-        // add
         public List<XNode.Node> SelectedNodes()
         {
             return Selection.objects.Select(x => x as XNode.Node).Where(x => x != null && x.graph == graph).ToList();
@@ -679,6 +800,93 @@ namespace XNodeEditor {
             EditorUtility.SetDirty(graph);
             if (NodeEditorPreferences.GetSettings().autoSave) AssetDatabase.SaveAssets();
             autoConnectOutput = null;
+        }
+
+        bool IsInsideBounds(Vector2 p1, Vector2 p2, Rect r)
+        {
+            float minX = Mathf.Min(p1.x, p2.x) - 200;
+            float maxX = Mathf.Max(p1.x, p2.x) + 200;
+            float minY = Mathf.Min(p1.y, p2.y) - 300;
+            float maxY = Mathf.Max(p1.y, p2.y) + 300;
+
+            Rect connectionArea = new Rect(minX, minY, maxX - minX, maxY - minY);
+
+            if (!r.Overlaps(connectionArea))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        bool LineIntersectsRect(Vector2 p1, Vector2 p2, Rect r, out Vector2 intersectionPoint)
+        {
+            intersectionPoint = Vector2.zero;
+
+            if (r.Contains(p1))
+            {
+                intersectionPoint = p1;
+                return true;
+            }
+
+            // 2. Early Out (AABB Check)
+            float minX = Mathf.Min(p1.x, p2.x);
+            float maxX = Mathf.Max(p1.x, p2.x);
+            float minY = Mathf.Min(p1.y, p2.y);
+            float maxY = Mathf.Max(p1.y, p2.y);
+
+            if (maxX < r.xMin || minX > r.xMax || maxY < r.yMin || minY > r.yMax)
+                return false;
+
+            Vector2[] corners = {
+                new Vector2(r.xMin, r.yMin), new Vector2(r.xMax, r.yMin), // Top
+                new Vector2(r.xMax, r.yMin), new Vector2(r.xMax, r.yMax), // Right
+                new Vector2(r.xMax, r.yMax), new Vector2(r.xMin, r.yMax), // Bottom
+                new Vector2(r.xMin, r.yMax), new Vector2(r.xMin, r.yMin)  // Left
+            };
+
+            float minU = float.MaxValue;
+            bool hit = false;
+
+            for (int i = 0; i < 8; i += 2)
+            {
+                float u = GetIntersectionU(p1, p2, corners[i], corners[i + 1]);
+
+                // If we found a valid intersection, keep the one closest to p1 (the entry point)
+                if (u != -1f && u < minU)
+                {
+                    minU = u;
+                    hit = true;
+                }
+            }
+
+            if (hit)
+            {
+                intersectionPoint = p1 + minU * (p2 - p1);
+            }
+            else if (r.Contains(p2))
+            {
+                intersectionPoint = p2;
+                return true;
+            }
+
+            return hit;
+        }
+
+        float GetIntersectionU(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2)
+        {
+            float d = (a2.x - a1.x) * (b2.y - b1.y) - (a2.y - a1.y) * (b2.x - b1.x);
+
+            if (Mathf.Approximately(d, 0))
+                return -1f;
+
+            float u = ((b1.x - a1.x) * (b2.y - b1.y) - (b1.y - a1.y) * (b2.x - b1.x)) / d;
+            float v = ((b1.x - a1.x) * (a2.y - a1.y) - (b1.y - a1.y) * (a2.x - a1.x)) / d;
+
+            if (u >= 0f && u <= 1f && v >= 0f && v <= 1f)
+                return u;
+
+            return -1f;
         }
     }
 }

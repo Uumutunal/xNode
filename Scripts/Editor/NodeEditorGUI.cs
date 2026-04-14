@@ -4,12 +4,14 @@ using System.Diagnostics;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using XNode;
 using XNodeEditor.Internal;
 #if UNITY_2019_1_OR_NEWER && USE_ADVANCED_GENERIC_MENU
 using GenericMenu = XNodeEditor.AdvancedGenericMenu;
 #endif
 
-namespace XNodeEditor {
+namespace XNodeEditor
+{
     /// <summary> Contains GUI methods </summary>
     public partial class NodeEditorWindow {
         public NodeGraphEditor graphEditor;
@@ -21,21 +23,26 @@ namespace XNodeEditor {
         public event Action onLateGUI;
         private static readonly Vector3[] polyLineTempArray = new Vector3[2];
 
+        // segment list of connections
+        private static List<Vector2> segmentList = new();
+        public Dictionary<Connection, List<Vector2>> connectionCache = new();
+        public Connection hoveredConnection = null;
+
         protected virtual void OnGUI() {
             Event e = Event.current;
             Matrix4x4 m = GUI.matrix;
             if (graph == null) return;
             ValidateGraphEditor();
+            Stopwatch stopwatch = Stopwatch.StartNew();
             Controls();
+            stopwatch.Stop();
 
 
             DrawGrid(position, zoom, panOffset);
             DrawOverlays();
             DrawConnections();
             DrawDraggedConnection();
-            Stopwatch stopwatch = Stopwatch.StartNew();
             DrawNodes();
-            stopwatch.Stop();
             DrawSelectionBox();
             DrawTooltip();
             graphEditor.OnGUI();
@@ -164,10 +171,13 @@ namespace XNodeEditor {
             polyLineTempArray[1].x = p1.x;
             polyLineTempArray[1].y = p1.y;
             Handles.DrawAAPolyLine(thickness, polyLineTempArray);
+            segmentList.Add(p0);
+            segmentList.Add(p1);
         }
 
         /// <summary> Draw a bezier from output to input in grid coordinates </summary>
-        public void DrawNoodle(Gradient gradient, NoodlePath path, NoodleStroke stroke, float thickness, List<Vector2> gridPoints) {
+        public List<Vector2> DrawNoodle(Gradient gradient, NoodlePath path, NoodleStroke stroke, float thickness, List<Vector2> gridPoints) {
+            segmentList = new();
             // convert grid points to window points
             for (int i = 0; i < gridPoints.Count; ++i)
                 gridPoints[i] = GridToWindowPosition(gridPoints[i]);
@@ -337,6 +347,8 @@ namespace XNodeEditor {
                     break;
             }
             Handles.color = originalHandlesColor;
+
+            return segmentList;
         }
 
         /// <summary> Draws all connections </summary>
@@ -346,11 +358,14 @@ namespace XNodeEditor {
             hoveredReroute = new RerouteReference();
 
             List<Vector2> gridPoints = new List<Vector2>(2);
+            connectionCache = new();
 
             Color col = GUI.color;
             foreach (XNode.Node node in graph.nodes) {
                 //If a null node is found, return. This can happen if the nodes associated script is deleted. It is currently not possible in Unity to delete a null asset.
                 if (node == null) continue;
+
+                Vector2 outputPos = GridToWindowPositionNoClipped(node.position) / _zoom;
 
                 // Draw full connections and output > reroute
                 foreach (XNode.NodePort output in node.Outputs) {
@@ -363,6 +378,16 @@ namespace XNodeEditor {
 
                     for (int k = 0; k < output.ConnectionCount; k++) {
                         XNode.NodePort input = output.GetConnection(k);
+
+                        Vector2 inputPos = GridToWindowPositionNoClipped(input.node.position) / _zoom;
+                        
+                        if ((inputPos.x < 0 && outputPos.x < 0) ||
+                            (inputPos.x > position.width && outputPos.x > position.width) ||
+                            (inputPos.y < 0 && outputPos.y < 0) ||
+                            (inputPos.y > position.height && outputPos.y > position.height))
+                        {
+                            continue;
+                        }
 
                         Gradient noodleGradient = graphEditor.GetNoodleGradient(output, input);
                         float noodleThickness = graphEditor.GetNoodleThickness(output, input);
@@ -381,7 +406,13 @@ namespace XNodeEditor {
                         gridPoints.Add(fromRect.center);
                         gridPoints.AddRange(reroutePoints);
                         gridPoints.Add(toRect.center);
-                        DrawNoodle(noodleGradient, noodlePath, noodleStroke, noodleThickness, gridPoints);
+                        var segments = DrawNoodle(noodleGradient, noodlePath, noodleStroke, noodleThickness, gridPoints);
+
+                        Connection connection = new();
+                        connection.Input = input;
+                        connection.Output = output;
+
+                        connectionCache.TryAdd(connection, segments);
 
                         // Loop through reroute points again and draw the points
                         for (int i = 0; i < reroutePoints.Count; i++) {
@@ -618,4 +649,6 @@ namespace XNodeEditor {
             Repaint();
         }
     }
+
+
 }
