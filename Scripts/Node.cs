@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
 namespace XNode {
@@ -140,9 +141,31 @@ namespace XNode {
         /// <summary> Checks all connections for invalid references, and removes them. </summary>
         public void VerifyConnections() {
             foreach (NodePort port in Ports) port.VerifyConnections();
-        }  
+        }
 
-#region Dynamic Ports
+        public void ResetValues()
+        {
+            var fields = GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            foreach (var field in fields)
+            {
+                var attr = field.GetCustomAttribute<NodeDefaultAttribute>();
+                if (attr == null) continue;
+
+                var defaultValue = attr.Default;
+
+                // Validate type once
+                if (defaultValue != null && !field.FieldType.IsAssignableFrom(defaultValue.GetType()))
+                {
+                    continue;
+                }
+
+                //_defaultCache[field] = defaultValue;
+                field.SetValue(this, defaultValue);
+            }
+        }
+
+        #region Dynamic Ports
         /// <summary> Convenience function. </summary>
         /// <seealso cref="AddInstancePort"/>
         /// <seealso cref="AddInstanceOutput"/>
@@ -384,7 +407,23 @@ namespace XNode {
                 this.width = width;
             }
         }
-#endregion
+
+        [AttributeUsage(AttributeTargets.Field, Inherited = false)]
+        public class NodeDefaultAttribute : Attribute
+        {
+            public object Default { get; }
+
+            public NodeDefaultAttribute(int value) => Default = value;
+            public NodeDefaultAttribute(float value) => Default = value;
+            public NodeDefaultAttribute(bool value) => Default = value;
+
+            public NodeDefaultAttribute(float x, float y)
+                => Default = new Vector2(x, y);
+
+            public NodeDefaultAttribute(float x, float y, float z)
+                => Default = new Vector3(x, y, z);
+        }
+        #endregion
 
         [Serializable] private class NodePortDictionary : Dictionary<string, NodePort>, ISerializationCallbackReceiver {
             [SerializeField] private List<string> keys = new List<string>();

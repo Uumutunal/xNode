@@ -148,6 +148,16 @@ namespace XNodeEditor {
             menu.AddItem(new GUIContent("Copy"), false, NodeEditorWindow.current.CopySelectedNodes);
             menu.AddItem(new GUIContent("Duplicate"), false, NodeEditorWindow.current.DuplicateSelectedNodes);
 
+            menu.AddItem(new GUIContent("Reset"), false, () =>
+            {
+                XNode.Node[] selectedNodes = Selection.objects.Select(x => x as XNode.Node).Where(x => x != null).ToArray();
+                foreach (XNode.Node selectedNode in selectedNodes)
+                {
+                    selectedNode.ResetValues();
+                }
+            }
+            );
+
             if (canRemove) menu.AddItem(new GUIContent("Remove"), false, NodeEditorWindow.current.RemoveSelectedNodes);
             else menu.AddItem(new GUIContent("Remove"), false, null);
 

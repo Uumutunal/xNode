@@ -372,7 +372,7 @@ namespace XNodeEditor
                     //Needs cleanup. Null checks are ugly
                     Rect fromRect;
                     if (!_portConnectionPoints.TryGetValue(output, out fromRect)) continue;
-
+                     
                     Color portColor = graphEditor.GetPortColor(output);
                     GUIStyle portStyle = graphEditor.GetPortStyle(output);
 
@@ -383,7 +383,7 @@ namespace XNodeEditor
                         
                         if ((inputPos.x < 0 && outputPos.x < 0) ||
                             (inputPos.x > position.width && outputPos.x > position.width) ||
-                            (inputPos.y < 0 && outputPos.y < 0) ||
+                            (inputPos.y < -200 && outputPos.y < -200) ||
                             (inputPos.y > position.height && outputPos.y > position.height))
                         {
                             continue;

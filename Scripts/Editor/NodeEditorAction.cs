@@ -153,19 +153,25 @@ namespace XNodeEditor
                                 selectedReroutes[i].SetPoint(pos);
                             }
 
-
                             if (altHeld)
                             {
                                 var input = selectedNode.Inputs.FirstOrDefault();
-                                var output = selectedNode.Outputs.FirstOrDefault();
-
                                 var inputConn = input?.Connection;
-                                var outputConn = output?.Connection;
 
-                                if (inputConn != null && outputConn != null)
+                                if (inputConn != null)
                                 {
-                                    inputConn.Connect(outputConn);
+                                    foreach (var output in selectedNode.Outputs)
+                                    {
+                                        if (output.IsConnected)
+                                        {
+                                            foreach (var conn in output.GetConnections())
+                                            {
+                                                inputConn.Connect(conn);
+                                            }
+                                        }
+                                    }
                                 }
+
                                 selectedNode.ClearConnections();
                             }
 
@@ -228,7 +234,6 @@ namespace XNodeEditor
                                     }
                                 }
                             }
-
                             //
 
                             NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
@@ -477,8 +482,46 @@ namespace XNodeEditor
                     }
                     if (e.keyCode == KeyCode.X)
                     {
+                        if (e.control)
+                        {
+                            var selectedNodes = Selection.objects.Where(x => x is Node).Select(x => x as XNode.Node);
+
+                            foreach (var node in selectedNodes)
+                            {
+                                NodePort inputPort = null;
+                                foreach (var input in node.Inputs)
+                                {
+                                    if (input.Connection != null)
+                                    {
+                                        inputPort = input.Connection;
+                                        break;
+                                    }
+                                }
+
+                                if (inputPort == null) { continue; }
+
+                                foreach (var output in node.Outputs)
+                                {
+                                    foreach (var outputPort in output.GetConnections())
+                                    {
+                                        inputPort.Connect(outputPort);
+                                    }
+                                }
+
+                            }
+                        }
                         RemoveSelectedNodes();
                         e.Use();
+                    }
+                    if (e.keyCode == KeyCode.Backspace)
+                    {
+                        var selectedNodes = Selection.objects.Where(x => x is Node).Select(x => x as XNode.Node);
+                        foreach (XNode.Node selectedNode in selectedNodes)
+                        {
+                            selectedNode.ResetValues();
+                        }
+
+                        RepaintAll();
                     }
                     if (e.keyCode == KeyCode.LeftAlt || e.keyCode == KeyCode.RightAlt)
                     {
