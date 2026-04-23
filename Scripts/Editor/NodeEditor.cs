@@ -20,7 +20,7 @@ namespace XNodeEditor {
         /// <summary> Fires every whenever a node was modified through the editor </summary>
         public static Action<XNode.Node> onUpdateNode;
         public readonly static Dictionary<XNode.NodePort, Vector2> portPositions = new Dictionary<XNode.NodePort, Vector2>();
-
+        protected readonly HashSet<string> excludes = new HashSet<string> { "m_Script", "graph", "position", "ports", "color" };
 #if ODIN_INSPECTOR
         protected internal static bool inNodeEditor = false;
 #endif
@@ -39,7 +39,6 @@ namespace XNodeEditor {
             // serializedObject.Update(); must go at the start of an inspector gui, and
             // serializedObject.ApplyModifiedProperties(); goes at the end.
             serializedObject.Update();
-            string[] excludes = { "m_Script", "graph", "position", "ports" };
 
 #if ODIN_INSPECTOR
             try
@@ -114,6 +113,7 @@ namespace XNodeEditor {
             // Try get color from [NodeTint] attribute
             Type type = target.GetType();
             Color color;
+            if (target.color != NodeEditorPreferences.GetSettings().tintColor) return target.color;
             if (type.TryGetAttributeTint(out color)) return color;
             // Return default color (grey)
             else return NodeEditorPreferences.GetSettings().tintColor;

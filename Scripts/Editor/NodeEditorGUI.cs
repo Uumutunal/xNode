@@ -379,6 +379,12 @@ namespace XNodeEditor
                     for (int k = 0; k < output.ConnectionCount; k++) {
                         XNode.NodePort input = output.GetConnection(k);
 
+                        // Error handling
+                        if (input == null) continue; //If a script has been updated and the port doesn't exist, it is removed and null is returned. If this happens, return.
+                        if (!input.IsConnectedTo(output)) input.Connect(output);
+                        Rect toRect;
+                        if (!_portConnectionPoints.TryGetValue(input, out toRect)) continue;
+
                         Vector2 inputPos = GridToWindowPositionNoClipped(input.node.position) / _zoom;
                         
                         if ((inputPos.x < 0 && outputPos.x < 0) ||
@@ -393,12 +399,6 @@ namespace XNodeEditor
                         float noodleThickness = graphEditor.GetNoodleThickness(output, input);
                         NoodlePath noodlePath = graphEditor.GetNoodlePath(output, input);
                         NoodleStroke noodleStroke = graphEditor.GetNoodleStroke(output, input);
-
-                        // Error handling
-                        if (input == null) continue; //If a script has been updated and the port doesn't exist, it is removed and null is returned. If this happens, return.
-                        if (!input.IsConnectedTo(output)) input.Connect(output);
-                        Rect toRect;
-                        if (!_portConnectionPoints.TryGetValue(input, out toRect)) continue;
 
                         List<Vector2> reroutePoints = output.GetReroutePoints(k);
 
