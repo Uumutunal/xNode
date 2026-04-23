@@ -176,7 +176,7 @@ namespace XNodeEditor
                             }
 
                             //
-                            List<NodePort> inputs = selectedNode.Inputs.ToList();
+                            List<NodePort> inputs = selectedNode?.Inputs.ToList();
                             if (Selection.objects.Length == 1 && inputs.Count > 0 && !inputs[0].IsConnected && !altHeld)
                             {
                                 Vector2 nodePos = GridToWindowPosition(selectedNode.position);
@@ -667,9 +667,30 @@ namespace XNodeEditor
         private void InsertDuplicateNodes(XNode.Node[] nodes, Vector2 topLeft) {
             if (nodes == null || nodes.Length == 0) return;
 
-            // Get top-left node
-            Vector2 topLeftNode = nodes.Select(x => x.position).Aggregate((x, y) => new Vector2(Mathf.Min(x.x, y.x), Mathf.Min(x.y, y.y)));
-            Vector2 offset = topLeft - topLeftNode;
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+            Vector2 max = new Vector2(float.MinValue, float.MinValue);
+
+            foreach (var node in nodes)
+            {
+                Vector2 pos = node.position;
+
+                if (!nodeSizes.TryGetValue(node, out var size))
+                    size = new Vector2(200, 100);
+
+                Vector2 nodeMin = pos;
+                Vector2 nodeMax = pos + size;
+
+                min.x = Mathf.Min(min.x, nodeMin.x);
+                min.y = Mathf.Min(min.y, nodeMin.y);
+
+                max.x = Mathf.Max(max.x, nodeMax.x);
+                max.y = Mathf.Max(max.y, nodeMax.y);
+            }
+
+            // center of all nodes
+            Vector2 center = (min + max) * 0.5f;
+
+            Vector2 offset = topLeft - center;
 
             UnityEngine.Object[] newNodes = new UnityEngine.Object[nodes.Length];
             Dictionary<XNode.Node, XNode.Node> substitutes = new Dictionary<XNode.Node, XNode.Node>();
