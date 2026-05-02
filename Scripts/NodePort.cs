@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using UnityEngine;
 
@@ -33,7 +34,7 @@ namespace XNode
             internal set { _typeConstraint = value; }
         }
 
-        /// <summary> Is this port connected to anytihng? </summary>
+        /// <summary> Is this port connected to anything? </summary>
         public bool IsConnected { get { return connections.Count != 0; } }
         public bool IsInput { get { return direction == IO.Input; } }
         public bool IsOutput { get { return direction == IO.Output; } }

@@ -175,9 +175,12 @@ namespace XNodeEditor
                                 selectedNode.ClearConnections();
                             }
 
-                            //
                             List<NodePort> inputs = selectedNode?.Inputs.ToList();
-                            if (Selection.objects.Length == 1 && inputs.Count > 0 && !inputs[0].IsConnected && !altHeld)
+                            List<NodePort> outputs = selectedNode?.Outputs.ToList();
+                            bool isConnected =
+                                (inputs != null && inputs.Any(x => x.IsConnected)) ||
+                                (outputs != null && outputs.Any(x => x.IsConnected));
+                            if (Selection.objects.Length == 1 && inputs.Count > 0 && !isConnected && !altHeld)
                             {
                                 Vector2 nodePos = GridToWindowPosition(selectedNode.position);
                                 Vector2 size = nodeSizes.TryGetValue(selectedNode, out var s) ? s : new Vector2(50, 50);
@@ -211,6 +214,7 @@ namespace XNodeEditor
                                             hoveredConnection = connection;
                                             isHoveringConnection = true;
                                             intersectedConnections[connection] = WindowToGridPosition(intersection);
+
                                             break;
                                         }
                                     }
@@ -234,7 +238,6 @@ namespace XNodeEditor
                                     }
                                 }
                             }
-                            //
 
                             NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
                             int controlID = GUIUtility.GetControlID(FocusType.Passive);
@@ -256,7 +259,7 @@ namespace XNodeEditor
                             Repaint();
                         }
 
-                        if (!IsHoveringNode && frameControlID == 0)
+                        if (!IsHoveringNode && frameControlID == 0 && GUIUtility.hotControl == 0)
                         {
                             NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
                             int controlID = GUIUtility.GetControlID(FocusType.Passive);
@@ -267,8 +270,12 @@ namespace XNodeEditor
                         panOffset += e.delta * zoom;
                         isPanning = true;
                         NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
-                        int controlID = GUIUtility.GetControlID(FocusType.Passive);
-                        GUIUtility.hotControl = controlID;
+
+                        if (GUIUtility.hotControl == 0)  
+                        {
+                            int controlID = GUIUtility.GetControlID(FocusType.Passive);
+                            GUIUtility.hotControl = controlID;
+                        } 
                     }
                     break;
                 case EventType.MouseDown:
@@ -380,21 +387,25 @@ namespace XNodeEditor
 
                             IEnumerable<XNode.Node> nodes = Selection.objects.Where(x => x is XNode.Node).Select(x => x as XNode.Node);
 
-                            //
                             if (hoveredConnection != null && !altHeld)
                             {
                                 var node = nodes.FirstOrDefault();
+
+                                //TODO: add undo support for auto connection on drop
+                                //Undo.RecordObject(hoveredConnection.Output.node, "Auto Connect");
+                                //Undo.RecordObject(hoveredConnection.Input.node, "Auto Connect");
+                                //Undo.RecordObject(node, "Auto Connect");
+
                                 var selectedInput = node.Inputs.FirstOrDefault();
                                 var selectedOutput = node.Outputs.FirstOrDefault();
                                 if (selectedInput != null && !selectedInput.IsConnected)
                                 {
                                     selectedInput.Connect(hoveredConnection.Output);
                                     selectedOutput.Connect(hoveredConnection.Input);
-                                }
+
+                                } 
                                 hoveredConnection = null;
                             }
-                            //
-
 
                             foreach (XNode.Node node in nodes) EditorUtility.SetDirty(node);
                             if (NodeEditorPreferences.GetSettings().autoSave) AssetDatabase.SaveAssets();
@@ -511,17 +522,7 @@ namespace XNodeEditor
                             }
                         }
                         RemoveSelectedNodes();
-                        e.Use();
-                    }
-                    if (e.keyCode == KeyCode.Backspace)
-                    {
-                        var selectedNodes = Selection.objects.Where(x => x is Node).Select(x => x as XNode.Node);
-                        foreach (XNode.Node selectedNode in selectedNodes)
-                        {
-                            selectedNode.ResetValues();
-                        }
-
-                        RepaintAll();
+                        Repaint();
                     }
                     if (e.keyCode == KeyCode.LeftAlt || e.keyCode == KeyCode.RightAlt)
                     {
@@ -689,7 +690,6 @@ namespace XNodeEditor
 
             // center of all nodes
             Vector2 center = (min + max) * 0.5f;
-
             Vector2 offset = topLeft - center;
 
             UnityEngine.Object[] newNodes = new UnityEngine.Object[nodes.Length];
@@ -782,20 +782,19 @@ namespace XNodeEditor
             SelectionBox = new();
         }
 
-        bool IsOverControl(XNode.Node node)
+        public bool IsHoveringNodeBody(XNode.Node node)
         {
             Vector2 mousePos = Event.current.mousePosition;
             Vector2 nodePos = GridToWindowPosition(node.position);
 
-            foreach (Rect r in node.controlRects)
+            if (nodeSizes.TryGetValue(node, out var size))
             {
-                Rect worldRect = new Rect(
-                    nodePos + r.position / zoom,
-                    r.size / zoom
-                );
+                Rect nodeRect = new Rect(nodePos, new Vector2(size.x / zoom, size.y / zoom));
 
-                if (worldRect.Contains(mousePos))
+                if (nodeRect.Contains(mousePos))
+                {
                     return true;
+                }
             }
 
             return false;

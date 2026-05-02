@@ -37,7 +37,6 @@ namespace XNodeEditor
             Controls();
             stopwatch.Stop();
 
-
             DrawGrid(position, zoom, panOffset);
             DrawOverlays();
             DrawConnections();
@@ -461,7 +460,7 @@ namespace XNodeEditor
             BeginZoomed(position, zoom, topPadding);
 
             Vector2 mousePos = Event.current.mousePosition;
-
+            var tempHoveredNode = hoveredNode;
             if (e.type != EventType.Layout) {
                 hoveredNode = null;
                 hoveredPort = null;
@@ -536,6 +535,12 @@ namespace XNodeEditor
                 GUI.color = guiColor;
                 EditorGUI.BeginChangeCheck();
 
+                bool prevEnabled = GUI.enabled;
+                if (e.type == EventType.MouseDown && tempHoveredNode != node)
+                {
+                    GUI.enabled = false;
+                }
+
                 //Draw node contents
                 nodeEditor.OnHeaderGUI();
                 nodeEditor.OnBodyGUI();
@@ -607,6 +612,7 @@ namespace XNodeEditor
                 }
 
                 GUILayout.EndArea();
+                GUI.enabled = prevEnabled;
             }
 
             if (e.type != EventType.Layout && currentActivity == NodeActivity.DragGrid) Selection.objects = preSelection.ToArray();
@@ -616,6 +622,7 @@ namespace XNodeEditor
             //This is done through reflection because OnValidate is only relevant in editor,
             //and thus, the code should not be included in build.
             if (onValidate != null && EditorGUI.EndChangeCheck()) onValidate.Invoke(Selection.activeObject, null);
+
         }
             
         private bool ShouldBeCulled(XNode.Node node) {

@@ -69,10 +69,15 @@ namespace XNodeEditor {
                         {
                             int index = i;
                             bool isSelected = property.enumValueIndex == i;
+
+                            string propertyPath = property.propertyPath;
+                            SerializedObject serializedObject = property.serializedObject;
+
                             menu.AddItem(new GUIContent(property.enumDisplayNames[i]), isSelected, () =>
                             {
-                                property.enumValueIndex = index;
-                                property.serializedObject.ApplyModifiedProperties();
+                                SerializedProperty prop = serializedObject.FindProperty(propertyPath);
+                                prop.enumValueIndex = index;
+                                serializedObject.ApplyModifiedProperties();
                             });
                         }
 
