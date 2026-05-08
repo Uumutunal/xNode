@@ -53,8 +53,6 @@ namespace XNodeEditor
         private bool isDoubleClick = false;
         private Vector2 lastMousePosition;
         private float dragThreshold = .01f;
-        private int frameControlID = 0;
-        private int graphDragControlId = 0;
         private bool altHeld = false;
 
 
@@ -106,6 +104,7 @@ namespace XNodeEditor
                             bool gridSnap = NodeEditorPreferences.GetSettings().gridSnap;
                             if (e.control) gridSnap = !gridSnap;
                             XNode.Node selectedNode = null;
+                            AcquireControl();
 
                             Vector2 mousePos = WindowToGridPosition(e.mousePosition);
                             // Move selected nodes with offset
@@ -239,16 +238,14 @@ namespace XNodeEditor
                                 }
                             }
 
-                            NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
-                            int controlID = GUIUtility.GetControlID(FocusType.Passive);
-                            GUIUtility.hotControl = controlID;
-
                             Repaint();
                         } else if (currentActivity == NodeActivity.HoldGrid) {
                             currentActivity = NodeActivity.DragGrid;
                             preBoxSelection = Selection.objects;
                             preBoxSelectionReroute = selectedReroutes.ToArray();
                             dragBoxStart = WindowToGridPosition(e.mousePosition);
+
+                            AcquireControl();
                             Repaint();
                         } else if (currentActivity == NodeActivity.DragGrid) {
                             Vector2 boxStartPos = GridToWindowPosition(dragBoxStart);
@@ -258,27 +255,15 @@ namespace XNodeEditor
                             SelectionBox = new Rect(boxStartPos, boxSize);
                             Repaint();
                         }
-
-                        if (!IsHoveringNode && frameControlID == 0 && GUIUtility.hotControl == 0)
-                        {
-                            NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
-                            int controlID = GUIUtility.GetControlID(FocusType.Passive);
-                            GUIUtility.hotControl = controlID;
-                        }
                     } else if (e.button == 1 || e.button == 2) {
                         //check drag threshold for larger screens
                         panOffset += e.delta * zoom;
                         isPanning = true;
                         NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
-
-                        if (GUIUtility.hotControl == 0)  
-                        {
-                            int controlID = GUIUtility.GetControlID(FocusType.Passive);
-                            GUIUtility.hotControl = controlID;
-                        } 
+                        AcquireControl();
                     }
                     break;
-                case EventType.MouseDown:
+                case EventType.MouseDown: 
                     Repaint();
                     if (e.button == 0) {
                         draggedOutputReroutes.Clear();
@@ -302,7 +287,6 @@ namespace XNodeEditor
                                 }
                             }
                         } else if (IsHoveringNode && IsHoveringTitle(hoveredNode) && !IsHoveringToolbar) {
-                            graphDragControlId = GUIUtility.GetControlID(FocusType.Passive);
 
                             // If mousedown on node header, select or deselect
                             if (!Selection.Contains(hoveredNode)) {
@@ -340,22 +324,9 @@ namespace XNodeEditor
                                 Selection.activeObject = null;
                             }
                         }
-                        else if (IsHoveringNode && !IsHoveringTitle(hoveredNode))
-                        {
-                            frameControlID = 1;
-                        }
                     }
                     break;
                 case EventType.MouseUp:
-                    if (currentActivity != NodeActivity.Idle || IsDraggingPort || isPanning)
-                    {
-                        if (GUIUtility.hotControl == graphDragControlId)
-                        {
-                            GUIUtility.hotControl = 0;
-                            NodeEditorWindow.current.wantsMouseEnterLeaveWindow = false;
-                        }
-                    }
-                    frameControlID = 0;
                     if (e.button == 0) {
                         //Port drag release
                         if (IsDraggingPort) {
@@ -548,16 +519,11 @@ namespace XNodeEditor
                         if (e.type == EventType.ExecuteCommand) DuplicateSelectedNodes();
                         e.Use();
                     } else if (e.commandName == "Copy") {
-                        if (true) {
-                            if (e.type == EventType.ExecuteCommand) CopySelectedNodes();
-                            e.Use();
-                        }
+                        if (e.type == EventType.ExecuteCommand) CopySelectedNodes();
+                        e.Use();
                     } else if (e.commandName == "Paste") {
-                        if (true)
-                        {
-                            if (e.type == EventType.ExecuteCommand) PasteNodes(WindowToGridPosition(lastMousePosition));
-                            e.Use();
-                        }
+                        if (e.type == EventType.ExecuteCommand) PasteNodes(WindowToGridPosition(lastMousePosition));
+                        e.Use();
                     }
                     Repaint();
                     break;
@@ -851,12 +817,19 @@ namespace XNodeEditor
             return false;
         }
 
+        void AcquireControl()
+        {
+            NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
+            int controlID = GUIUtility.GetControlID(FocusType.Passive);
+            GUIUtility.hotControl = controlID;
+        }
+
         /// <summary> Attempt to connect dragged output to target node </summary>
         public void AutoConnect(XNode.Node node) {
             if (autoConnectOutput == null) return;
 
             // Find compatible input port
-            XNode.NodePort inputPort = node.Ports.FirstOrDefault(x => x.IsInput && graphEditor.CanConnect(autoConnectOutput, x));
+            XNode.NodePort inputPort = node.Ports.FirstOrDefault(x => x.IsInput &&  graphEditor.CanConnect(autoConnectOutput, x));
             if (inputPort != null) autoConnectOutput.Connect(inputPort);
 
             // Save changes
