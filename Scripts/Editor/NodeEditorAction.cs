@@ -494,6 +494,7 @@ namespace XNodeEditor
                         }
                         RemoveSelectedNodes();
                         Repaint();
+                        e.Use();
                     }
                     if (e.keyCode == KeyCode.LeftAlt || e.keyCode == KeyCode.RightAlt)
                     {
@@ -819,9 +820,13 @@ namespace XNodeEditor
 
         void AcquireControl()
         {
-            NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
-            int controlID = GUIUtility.GetControlID(FocusType.Passive);
-            GUIUtility.hotControl = controlID;
+            if (GUIUtility.hotControl == 0)
+            {
+                NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
+                int controlID = GUIUtility.GetControlID(FocusType.Passive);
+                GUIUtility.hotControl = controlID;
+            }
+
         }
 
         /// <summary> Attempt to connect dragged output to target node </summary>
