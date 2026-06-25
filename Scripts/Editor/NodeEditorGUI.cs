@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using XNode;
@@ -33,7 +31,7 @@ namespace XNodeEditor
             Matrix4x4 m = GUI.matrix;
             if (graph == null) return;
             ValidateGraphEditor();
-            Stopwatch stopwatch = Stopwatch.StartNew();
+            System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
             Controls();
             stopwatch.Stop();
 
@@ -46,7 +44,7 @@ namespace XNodeEditor
             DrawTooltip();
             graphEditor.OnGUI();
 
-            double time = stopwatch.ElapsedTicks * 1000.0 / Stopwatch.Frequency;
+            double time = stopwatch.ElapsedTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
             //UnityEngine.Debug.Log(time);
 
             // Run and reset onLateGUI
@@ -65,23 +63,28 @@ namespace XNodeEditor
 
         public static void BeginZoomed(Rect rect, float zoom, float topPadding) {
             GUI.EndClip();
-
+            float padding = topPadding;
+#if UNITY_2022_2_OR_NEWER
+            padding += 5;
+#endif
             GUIUtility.ScaleAroundPivot(Vector2.one / zoom, rect.size * 0.5f);
-            Vector4 padding = new Vector4(0, topPadding, 0, 0);
-            padding *= zoom;
-            GUI.BeginClip(new Rect(-((rect.width * zoom) - rect.width) * 0.5f, -(((rect.height * zoom) - rect.height) * 0.5f) + (topPadding * zoom),
+            GUI.BeginClip(new Rect(-((rect.width * zoom) - rect.width) * 0.5f, -(((rect.height * zoom) - rect.height) * 0.5f) + (padding * zoom),
                 rect.width * zoom,
                 rect.height * zoom));
         }
 
         public static void EndZoomed(Rect rect, float zoom, float topPadding) {
+            float padding = topPadding;
+#if UNITY_2022_2_OR_NEWER
+            padding += 5;
+#endif
             GUIUtility.ScaleAroundPivot(Vector2.one * zoom, rect.size * 0.5f);
             Vector3 offset = new Vector3(
                 (((rect.width * zoom) - rect.width) * 0.5f),
-                (((rect.height * zoom) - rect.height) * 0.5f) + (-topPadding * zoom) + topPadding,
+                (((rect.height * zoom) - rect.height) * 0.5f) + (-padding * zoom) + topPadding,
                 0);
             GUI.matrix = Matrix4x4.TRS(offset, Quaternion.identity, Vector3.one);
-        }
+        } 
 
         public void DrawGrid(Rect rect, float zoom, Vector2 panOffset) {
 
