@@ -87,6 +87,7 @@ namespace XNodeEditor
                 case EventType.MouseDrag:
                     if (e.button == 0) {
                         if (IsDraggingPort) {
+                            AcquireControl();
                             // Set target even if we can't connect, so as to prevent auto-conn menu from opening erroneously
                             if (IsHoveringPort && hoveredPort.IsInput && !draggedOutput.IsConnectedTo(hoveredPort)) {
                                 draggedOutputTarget = hoveredPort;
