@@ -260,7 +260,6 @@ namespace XNodeEditor
                         //check drag threshold for larger screens
                         panOffset += e.delta * zoom;
                         isPanning = true;
-                        NodeEditorWindow.current.wantsMouseEnterLeaveWindow = true;
                         AcquireControl();
                     }
                     break;
@@ -355,7 +354,10 @@ namespace XNodeEditor
                             draggedOutputTarget = null;
                             EditorUtility.SetDirty(graph);
                             if (NodeEditorPreferences.GetSettings().autoSave) AssetDatabase.SaveAssets();
-                        } else if (currentActivity == NodeActivity.DragNode) {
+
+                            ReleaseControl();
+                        }
+                        else if (currentActivity == NodeActivity.DragNode) {
 
                             IEnumerable<XNode.Node> nodes = Selection.objects.Where(x => x is XNode.Node).Select(x => x as XNode.Node);
 
@@ -534,6 +536,17 @@ namespace XNodeEditor
                     if (e.rawType == EventType.MouseUp && currentActivity == NodeActivity.DragGrid) {
                         Repaint();
                         currentActivity = NodeActivity.Idle;
+                    }
+                    if (e.rawType == EventType.MouseUp && e.button == 0)
+                    {
+                        //Release dragged connection
+                        draggedOutput = null;
+                        draggedOutputTarget = null;
+                        ReleaseControl();
+                    }
+                    if (e.rawType == EventType.MouseUp && e.button == 2)
+                    {
+                        isPanning = false;
                     }
                     break;
             }
@@ -827,7 +840,15 @@ namespace XNodeEditor
                 int controlID = GUIUtility.GetControlID(FocusType.Passive);
                 GUIUtility.hotControl = controlID;
             }
+        }
 
+        void ReleaseControl()
+        {
+            if (GUIUtility.hotControl != 0)
+            {
+                GUIUtility.hotControl = 0;
+                NodeEditorWindow.current.wantsMouseEnterLeaveWindow = false;
+            }
         }
 
         /// <summary> Attempt to connect dragged output to target node </summary>
